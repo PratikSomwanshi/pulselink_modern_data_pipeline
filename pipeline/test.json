@@ -41,7 +41,7 @@
 				},
 				"inputs": [
 					{
-						"referenceName": "PostgreSqlTable1",
+						"referenceName": "DS_PGSQL_NEON",
 						"type": "DatasetReference"
 					}
 				],

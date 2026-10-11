@@ -18,6 +18,10 @@
 			},
 			"sslMode": 2,
 			"authenticationType": "Basic"
+		},
+		"connectVia": {
+			"referenceName": "my-laptop",
+			"type": "IntegrationRuntimeReference"
 		}
 	},
 	"type": "Microsoft.DataFactory/factories/linkedservices"

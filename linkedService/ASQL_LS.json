@@ -18,6 +18,10 @@
 				},
 				"secretName": "sql-server-password"
 			}
+		},
+		"connectVia": {
+			"referenceName": "my-laptop",
+			"type": "IntegrationRuntimeReference"
 		}
 	}
 }

@@ -5,6 +5,10 @@
 		"type": "AzureBlobFS",
 		"typeProperties": {
 			"url": "https://pratikadls.dfs.core.windows.net/"
+		},
+		"connectVia": {
+			"referenceName": "my-laptop",
+			"type": "IntegrationRuntimeReference"
 		}
 	}
 }

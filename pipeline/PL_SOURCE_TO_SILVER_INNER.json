@@ -118,11 +118,130 @@
 						}
 					}
 				]
+			},
+			{
+				"name": "LANDING_TO_BRONZE",
+				"type": "DatabricksNotebook",
+				"dependsOn": [
+					{
+						"activity": "SOURCE_TO_LANDING_INGESTION",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"notebookPath": "/pulselink/pulselink-databrics/LANDING_TO_BRONZE",
+					"baseParameters": {
+						"source_system": {
+							"value": "@activity('READ_TABLE_DETAILS').output.firstRow.source_system",
+							"type": "Expression"
+						},
+						"table_name": {
+							"value": "@activity('READ_TABLE_DETAILS').output.firstRow.bronze_table_name",
+							"type": "Expression"
+						},
+						"landing_timestamp": {
+							"value": "@variables('START_TIME')",
+							"type": "Expression"
+						}
+					}
+				},
+				"linkedServiceName": {
+					"referenceName": "ADATABRICS_LS",
+					"type": "LinkedServiceReference"
+				}
+			},
+			{
+				"name": "BRONZE_TO_SILVER",
+				"type": "DatabricksNotebook",
+				"dependsOn": [
+					{
+						"activity": "LANDING_TO_BRONZE",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"notebookPath": "/pulselink/pulselink-databrics/BRONZE_TO_SILVER",
+					"baseParameters": {
+						"table_name": {
+							"value": "@activity('READ_TABLE_DETAILS').output.firstRow.silver_table_name",
+							"type": "Expression"
+						},
+						"landing_timestamp": {
+							"value": "@variables('START_TIME')",
+							"type": "Expression"
+						}
+					}
+				},
+				"linkedServiceName": {
+					"referenceName": "ADATABRICS_LS",
+					"type": "LinkedServiceReference"
+				}
+			},
+			{
+				"name": "UPDATE_SUCCESS_STATUS",
+				"type": "Script",
+				"dependsOn": [
+					{
+						"activity": "BRONZE_TO_SILVER",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 2,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"linkedServiceName": {
+					"referenceName": "ASQL_LS",
+					"type": "LinkedServiceReference"
+				},
+				"typeProperties": {
+					"scripts": [
+						{
+							"type": "Query",
+							"text": {
+								"value": "update ctrl.audit_log\nset status = 'SUCCESS', end_time = sysutcdatetime(), records_written=@{activity('BRONZE_TO_SILVER').output.runOutput}\nwhere adf_run_id='@{pipeline().parameters.adf_run_id}' and table_id=@{pipeline().parameters.table_id}",
+								"type": "Expression"
+							}
+						}
+					],
+					"scriptBlockExecutionTimeout": "02:00:00"
+				}
 			}
 		],
 		"parameters": {
 			"table_id": {
-				"type": "int"
+				"type": "int",
+				"defaultValue": 1
+			},
+			"adf_run_id": {
+				"type": "string",
+				"defaultValue": "a2"
 			}
 		},
 		"variables": {

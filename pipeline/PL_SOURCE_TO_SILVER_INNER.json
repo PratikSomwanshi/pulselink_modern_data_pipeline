@@ -52,13 +52,7 @@
 				"type": "Copy",
 				"dependsOn": [
 					{
-						"activity": "READ_TABLE_DETAILS",
-						"dependencyConditions": [
-							"Succeeded"
-						]
-					},
-					{
-						"activity": "SET_START_TIME",
+						"activity": "CHECK_LOAD_TYPES",
 						"dependencyConditions": [
 							"Succeeded"
 						]
@@ -76,7 +70,7 @@
 					"source": {
 						"type": "PostgreSqlV2Source",
 						"query": {
-							"value": "select * from public.@{activity('READ_TABLE_DETAILS').output.firstRow.source_table_name}",
+							"value": "select * from public.@{activity('READ_TABLE_DETAILS').output.firstRow.source_table_name} \n@{\n    if(equals(activity('READ_TABLE_DETAILS').output.firstRow.load_type, 'FULL'), '', \n    concat(\n        'where ', activity('READ_TABLE_DETAILS').output.firstRow.watermark_column ,' > ', '''', variables('WATERMARK_VARIABLE'), ''''\n        )\n    )\n}",
 							"type": "Expression"
 						},
 						"queryTimeout": "02:00:00"
@@ -189,6 +183,14 @@
 						"landing_timestamp": {
 							"value": "@variables('START_TIME')",
 							"type": "Expression"
+						},
+						"load_type": {
+							"value": "@activity('READ_TABLE_DETAILS').output.firstRow.load_type",
+							"type": "Expression"
+						},
+						"merge_keys": {
+							"value": "@coalesce(activity('READ_TABLE_DETAILS').output.firstRow.merge_keys, '')",
+							"type": "Expression"
 						}
 					}
 				},
@@ -232,6 +234,135 @@
 					],
 					"scriptBlockExecutionTimeout": "02:00:00"
 				}
+			},
+			{
+				"name": "CHECK_LOAD_TYPES",
+				"type": "IfCondition",
+				"dependsOn": [
+					{
+						"activity": "READ_TABLE_DETAILS",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					},
+					{
+						"activity": "SET_START_TIME",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"expression": {
+						"value": "@not(equals(activity('READ_TABLE_DETAILS').output.firstRow.load_type, 'FULL'))",
+						"type": "Expression"
+					},
+					"ifTrueActivities": [
+						{
+							"name": "READ_WATERMARK",
+							"type": "Lookup",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"source": {
+									"type": "AzureSqlSource",
+									"sqlReaderQuery": {
+										"value": "select Watermark_value from ctrl.watermark where table_id = @{pipeline().parameters.table_id}",
+										"type": "Expression"
+									},
+									"queryTimeout": "02:00:00",
+									"partitionOption": "None"
+								},
+								"dataset": {
+									"referenceName": "DS_ASQL_TABLE_LIST",
+									"type": "DatasetReference"
+								}
+							}
+						},
+						{
+							"name": "STORE_WATERMARK_VALUE",
+							"type": "SetVariable",
+							"dependsOn": [
+								{
+									"activity": "READ_WATERMARK",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"variableName": "WATERMARK_VARIABLE",
+								"value": {
+									"value": "@activity('READ_WATERMARK').output.firstRow.watermark_value",
+									"type": "Expression"
+								}
+							}
+						}
+					]
+				}
+			},
+			{
+				"name": "UPDATING_WATERMARK_FOR_INCREMENTAL_LOAD",
+				"type": "IfCondition",
+				"dependsOn": [
+					{
+						"activity": "BRONZE_TO_SILVER",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"expression": {
+						"value": "@not(equals(activity('READ_TABLE_DETAILS').output.firstRow.load_type, 'FULL'))",
+						"type": "Expression"
+					},
+					"ifTrueActivities": [
+						{
+							"name": "UPDATE_WATERMARK_SCRIPT",
+							"type": "Script",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"linkedServiceName": {
+								"referenceName": "ASQL_LS",
+								"type": "LinkedServiceReference"
+							},
+							"typeProperties": {
+								"scripts": [
+									{
+										"type": "Query",
+										"text": {
+											"value": "update ctrl.watermark\nset watermark_value = sysutcdatetime()\nwhere table_id = @{pipeline().parameters.table_id};",
+											"type": "Expression"
+										}
+									}
+								],
+								"scriptBlockExecutionTimeout": "02:00:00"
+							}
+						}
+					]
+				}
 			}
 		],
 		"parameters": {
@@ -246,6 +377,9 @@
 		},
 		"variables": {
 			"START_TIME": {
+				"type": "String"
+			},
+			"WATERMARK_VARIABLE": {
 				"type": "String"
 			}
 		},

@@ -7,7 +7,7 @@
 		"typeProperties": {
 			"domain": "https://adb-7405607231414961.1.azuredatabricks.net",
 			"existingClusterId": "1012-061608-esgorqu3",
-			"encryptedCredential": "eyJDcmVkZW50aWFsSWQiOiJmMmFlMGE3Mi0wMzZkLTRkMzEtOTczNS03MmQ4MzQ4ODA3MzUiLCJWZXJzaW9uIjoiMi4wIiwiQ2xhc3NUeXBlIjoiTWljcm9zb2Z0LkRhdGFQcm94eS5Db3JlLkludGVyU2VydmljZURhdGFDb250cmFjdC5DcmVkZW50aWFsU1UwNkNZMTQifQ=="
+			"encryptedCredential": ""
 		},
 		"connectVia": {
 			"referenceName": "my-laptop",
